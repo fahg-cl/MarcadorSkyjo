@@ -170,6 +170,36 @@
       font-size: 0.92rem;
     }
 
+    .tiny-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .sync-status {
+      margin-top: 8px;
+      padding: 6px 8px;
+      border-radius: 999px;
+      background: #eef5ff;
+      border: 1px solid rgba(47,111,236,0.22);
+      color: var(--primary-dark);
+      font-size: 0.76rem;
+      font-weight: 850;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .viewer-mode .score-btn:disabled {
+      opacity: 1;
+      cursor: default;
+      background: rgba(255,255,255,0.74);
+      color: var(--text);
+    }
+
     .tiny-btn.danger {
       color: var(--danger);
       border-color: rgba(217, 45, 32, 0.22);
@@ -1000,12 +1030,17 @@
                 <span class="switch-label">Config.</span>
               </button>
               <button class="tiny-btn" id="toggle-summary-btn" type="button" title="Mostrar u ocultar resumen">👁️</button>
+              <button class="tiny-btn" id="host-code-btn" type="button" title="Crear o actualizar código de juego">🔗</button>
+              <button class="tiny-btn" id="watch-code-btn" type="button" title="Ver partida con código">👀</button>
+              <button class="tiny-btn hidden" id="refresh-remote-btn" type="button" title="Refrescar marcador">🔄</button>
+              <button class="tiny-btn hidden" id="exit-viewer-btn" type="button" title="Salir del modo espectador">🚪</button>
               <button class="tiny-btn" id="share-btn" type="button" title="Copiar o compartir resultado">📤</button>
               <button class="tiny-btn danger" id="clear-scores-btn" type="button" title="Limpiar puntajes">🧹</button>
             </div>
           </div>
 
           <div class="summary-bar" id="game-summary"></div>
+          <div class="sync-status hidden" id="sync-status"></div>
         </div>
 
         <div id="empty-state" class="empty-state">
@@ -1062,10 +1097,45 @@
     </div>
   </div>
 
-  <script>
+  <script type="module">
+    //import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+    import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+
+    // Para activar el código de juego compartido, reemplaza estos valores
+    // por la configuración de tu proyecto Firebase Web App.
+/*    const FIREBASE_CONFIG = {
+      apiKey: "PEGAR_API_KEY",
+      authDomain: "PEGAR_AUTH_DOMAIN",
+      databaseURL: "PEGAR_DATABASE_URL",
+      projectId: "PEGAR_PROJECT_ID",
+      appId: "PEGAR_APP_ID"
+    };
+*/
+
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-analytics.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  const firebaseConfig = {
+    apiKey: "AIzaSyBGtGjLmO_uPJbeK5aZXsPFPfbjDI9IO44",
+    authDomain: "skyjo-puntaje.firebaseapp.com",
+    databaseURL: "https://skyjo-puntaje-default-rtdb.firebaseio.com",
+    projectId: "skyjo-puntaje",
+    storageBucket: "skyjo-puntaje.firebasestorage.app",
+    messagingSenderId: "374539834776",
+    appId: "1:374539834776:web:1f3a51149d66562e9287ed",
+    measurementId: "G-9SWEQVE4P7"
+  };
+
     const CONFIG_KEY = "skyjo_config_v2";
     const GAME_KEY = "skyjo_game_v2";
     const UI_KEY = "skyjo_ui_v2";
+    const SYNC_KEY = "skyjo_sync_v3";
 
     const LEGACY_CONFIG_KEY = "skyjo_config_v1";
     const LEGACY_GAME_KEY = "skyjo_game_v1";
@@ -1107,6 +1177,17 @@
     let ui = loadUi();
     let selectedCell = null;
     let scoreDraft = "";
+    let sync = loadSync();
+    let remoteSaveTimer = null;
+    let remoteRefreshTimer = null;
+
+    const firebaseState = {
+      ready: false,
+      app: null,
+      auth: null,
+      db: null,
+      user: null
+    };
 
     const el = {
       app: document.getElementById("app"),
@@ -1126,6 +1207,11 @@
       leaderboard: document.getElementById("leaderboard"),
       clearScoresBtn: document.getElementById("clear-scores-btn"),
       shareBtn: document.getElementById("share-btn"),
+      hostCodeBtn: document.getElementById("host-code-btn"),
+      watchCodeBtn: document.getElementById("watch-code-btn"),
+      refreshRemoteBtn: document.getElementById("refresh-remote-btn"),
+      exitViewerBtn: document.getElementById("exit-viewer-btn"),
+      syncStatus: document.getElementById("sync-status"),
       toggleConfigBtn: document.getElementById("toggle-config-btn"),
       hideConfigBtn: document.getElementById("hide-config-btn"),
       toggleSummaryBtn: document.getElementById("toggle-summary-btn"),
@@ -1142,10 +1228,15 @@
 
     function init() {
       normalizeConfig();
+      applyIncomingGameCode();
       applyUi();
       renderConfig();
       renderGame();
       bindEvents();
+      startRemoteAutoRefresh();
+      if (isViewerMode() && sync.code) {
+        refreshRemoteGame(true);
+      }
     }
 
     function loadConfig() {
@@ -1206,6 +1297,19 @@
       }
     }
 
+    function loadSync() {
+      try {
+        const stored = JSON.parse(localStorage.getItem(SYNC_KEY));
+        return {
+          mode: stored?.mode || null,
+          code: stored?.code || null,
+          lastRemoteUpdate: stored?.lastRemoteUpdate || null
+        };
+      } catch {
+        return { mode: null, code: null, lastRemoteUpdate: null };
+      }
+    }
+
     function saveConfig() {
       normalizeConfig();
       localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
@@ -1215,10 +1319,17 @@
     function saveGame() {
       if (!game) return;
       localStorage.setItem(GAME_KEY, JSON.stringify(game));
+      if (isHostMode() && sync.code) {
+        queueRemoteSave();
+      }
     }
 
     function saveUi() {
       localStorage.setItem(UI_KEY, JSON.stringify(ui));
+    }
+
+    function saveSync() {
+      localStorage.setItem(SYNC_KEY, JSON.stringify(sync));
     }
 
     function normalizeConfig() {
@@ -1240,13 +1351,25 @@
     }
 
     function applyUi() {
+      const viewer = isViewerMode();
+      if (viewer) ui.configVisible = false;
+
+      el.app.classList.toggle("viewer-mode", viewer);
       el.app.classList.toggle("config-hidden", !ui.configVisible);
       el.toggleConfigBtn.setAttribute("aria-checked", String(ui.configVisible));
       el.toggleConfigBtn.title = ui.configVisible ? "Ocultar configuración" : "Mostrar configuración";
+      el.toggleConfigBtn.classList.toggle("hidden", viewer);
       el.gameSummary.classList.toggle("hidden", !ui.summaryVisible);
       el.scorePanel.classList.toggle("summary-collapsed", !ui.summaryVisible);
       el.toggleSummaryBtn.textContent = ui.summaryVisible ? "👁️" : "🙈";
       el.toggleSummaryBtn.title = ui.summaryVisible ? "Ocultar resumen" : "Mostrar resumen";
+
+      el.hostCodeBtn.classList.toggle("hidden", viewer);
+      el.watchCodeBtn.classList.toggle("hidden", viewer);
+      el.clearScoresBtn.classList.toggle("hidden", viewer);
+      el.refreshRemoteBtn.classList.toggle("hidden", !viewer);
+      el.exitViewerBtn.classList.toggle("hidden", !viewer);
+      el.syncStatus.classList.toggle("hidden", !sync.code);
     }
 
     function renderConfig() {
@@ -1442,6 +1565,10 @@
       });
 
       el.shareBtn.addEventListener("click", shareSummary);
+      el.hostCodeBtn.addEventListener("click", createOrUpdateGameCode);
+      el.watchCodeBtn.addEventListener("click", askAndLoadSpectatorGame);
+      el.refreshRemoteBtn.addEventListener("click", () => refreshRemoteGame(true));
+      el.exitViewerBtn.addEventListener("click", exitViewerMode);
 
       el.toggleConfigBtn.addEventListener("click", () => {
         ui.configVisible = !ui.configVisible;
@@ -1527,6 +1654,9 @@
         scores: createEmptyScores(config.rounds, players.length)
       };
 
+      sync = { mode: null, code: null, lastRemoteUpdate: null };
+      saveSync();
+      stopRemoteAutoRefresh();
       saveGame();
       renderConfig();
       renderGame();
@@ -1542,6 +1672,7 @@
         el.emptyState.classList.remove("hidden");
         el.gameArea.classList.add("hidden");
         el.gameSummary.innerHTML = "";
+        renderSyncStatus();
         el.shareBtn.disabled = true;
         el.clearScoresBtn.disabled = true;
         return;
@@ -1549,10 +1680,12 @@
 
       el.shareBtn.disabled = false;
       el.clearScoresBtn.disabled = false;
+      el.hostCodeBtn.disabled = isViewerMode();
       el.emptyState.classList.add("hidden");
       el.gameArea.classList.remove("hidden");
 
       renderSummary();
+      renderSyncStatus();
       renderLeaderboard();
       renderScoreTable();
       el.continueGameBtn.classList.toggle("hidden", !game);
@@ -1564,12 +1697,17 @@
       const startingDealerIndex = getIndexById(game.players, game.startingDealerId);
       const firstStarterIndex = (startingDealerIndex + 1) % game.players.length;
 
+      const syncChip = sync.code
+        ? `<span class="summary-chip">${isViewerMode() ? "👀" : "🔗"} ${escapeHtml(sync.code)}</span>`
+        : "";
+
       el.gameSummary.innerHTML = `
         <span class="summary-chip active">🎯 ${escapeHtml(activeText)}</span>
         <span class="summary-chip">👥 ${game.players.length}</span>
         <span class="summary-chip">🔁 ${game.rounds}</span>
         <span class="summary-chip">🃏 ${escapeHtml(getShortName(game.players[startingDealerIndex].name))}</span>
         <span class="summary-chip">⭐ ${escapeHtml(getShortName(game.players[firstStarterIndex].name))}</span>
+        ${syncChip}
       `;
     }
 
@@ -1607,6 +1745,7 @@
       const totalsByRound = getTotalsByRound();
       const currentRoundIndex = getCurrentRoundIndex();
       const startingDealerIndex = getIndexById(game.players, game.startingDealerId);
+      const viewer = isViewerMode();
 
       const table = document.createElement("table");
 
@@ -1676,16 +1815,18 @@
           const button = document.createElement("button");
           button.className = "score-btn";
           button.type = "button";
-          button.disabled = isLocked;
+          button.disabled = isLocked || viewer;
           button.style.borderColor = playerIndex === starterIndex && !isLocked ? "rgba(245, 158, 11, 0.55)" : "";
-          button.innerHTML = renderCellContent(score, total, playerIndex === starterIndex, isLocked);
+          button.innerHTML = renderCellContent(score, total, playerIndex === starterIndex, isLocked, viewer);
 
           button.title = isLocked
             ? `Ronda ${roundIndex + 1} bloqueada hasta completar la ronda anterior`
-            : `${player.name}, ronda ${roundIndex + 1}`;
+            : viewer
+              ? `${player.name}, ronda ${roundIndex + 1} · solo lectura`
+              : `${player.name}, ronda ${roundIndex + 1}`;
 
           button.addEventListener("click", () => {
-            if (!isLocked) openEditor(roundIndex, playerIndex);
+            if (!isLocked && !viewer) openEditor(roundIndex, playerIndex);
           });
 
           td.appendChild(button);
@@ -1701,7 +1842,7 @@
       el.scoreTable = table;
     }
 
-    function renderCellContent(score, total, isStarter, isLocked) {
+    function renderCellContent(score, total, isStarter, isLocked, viewer = false) {
       const mark = isStarter ? '<span class="starter-mark">⭐</span>' : "";
 
       if (isLocked) {
@@ -1709,13 +1850,15 @@
       }
 
       if (score === null) {
-        return `<span class="score-round">＋</span><span class="score-total">Ingresar</span>${mark}`;
+        const text = viewer ? "Pendiente" : "Ingresar";
+        return `<span class="score-round">＋</span><span class="score-total">${text}</span>${mark}`;
       }
 
       return `<span class="score-round">${formatNumber(score)} - ${formatNumber(total)}</span><span class="score-total">Ronda - Total</span>${mark}`;
     }
 
     function openEditor(roundIndex, playerIndex) {
+      if (isViewerMode()) return;
       selectedCell = { roundIndex, playerIndex };
       const player = game.players[playerIndex];
       const value = game.scores[roundIndex][playerIndex];
@@ -1884,6 +2027,261 @@
     function cleanName(value, index) {
       const clean = String(value || "").trim().replace(/\s+/g, " ");
       return clean || `Jugador ${index + 1}`;
+    }
+
+
+    function isFirebaseConfigured() {
+      return Boolean(
+        FIREBASE_CONFIG.apiKey &&
+        FIREBASE_CONFIG.databaseURL &&
+        !String(FIREBASE_CONFIG.apiKey).startsWith("PEGAR_") &&
+        !String(FIREBASE_CONFIG.databaseURL).startsWith("PEGAR_")
+      );
+    }
+
+    async function ensureFirebaseReady() {
+      if (!isFirebaseConfigured()) {
+        alert("Para usar código de juego debes configurar Firebase en el archivo index.html.");
+        return false;
+      }
+
+      if (firebaseState.ready && firebaseState.user) return true;
+
+      try {
+        firebaseState.app = firebaseState.app || initializeApp(FIREBASE_CONFIG);
+        firebaseState.auth = firebaseState.auth || getAuth(firebaseState.app);
+        firebaseState.db = firebaseState.db || getDatabase(firebaseState.app);
+        const credential = await signInAnonymously(firebaseState.auth);
+        firebaseState.user = credential.user;
+        firebaseState.ready = true;
+        return true;
+      } catch (error) {
+        console.error(error);
+        alert("No se pudo conectar con Firebase. Revisa la configuración y las reglas de seguridad.");
+        return false;
+      }
+    }
+
+    function isHostMode() {
+      return sync.mode === "host";
+    }
+
+    function isViewerMode() {
+      return sync.mode === "viewer";
+    }
+
+    function applyIncomingGameCode() {
+      const params = new URLSearchParams(window.location.search);
+      const code = normalizeGameCode(params.get("game") || params.get("juego") || "");
+      if (!code) return;
+
+      sync = { mode: "viewer", code, lastRemoteUpdate: null };
+      ui.configVisible = false;
+      saveSync();
+      saveUi();
+    }
+
+    function normalizeGameCode(value) {
+      const code = String(value || "").replace(/\D/g, "").slice(0, 7);
+      return code.length === 7 ? code : "";
+    }
+
+    async function createOrUpdateGameCode() {
+      if (!game) {
+        alert("Primero inicia una partida para poder crear el código de juego.");
+        return;
+      }
+
+      const ready = await ensureFirebaseReady();
+      if (!ready) return;
+
+      if (!isHostMode() || !sync.code) {
+        const code = await generateUniqueGameCode();
+        if (!code) return;
+
+        sync = { mode: "host", code, lastRemoteUpdate: null };
+        saveSync();
+        await set(ref(firebaseState.db, `games/${code}/private`), {
+          ownerUid: firebaseState.user.uid,
+          createdAt: Date.now()
+        });
+      }
+
+      const ok = await publishRemoteGame(true);
+      if (!ok) return;
+
+      const viewerUrl = buildViewerUrl(sync.code);
+      const text = `Marcador Skyjo\nCódigo de juego: ${sync.code}\nVer marcador: ${viewerUrl}`;
+
+      try {
+        if (navigator.share) {
+          await navigator.share({ title: "Marcador Skyjo", text });
+        } else {
+          await navigator.clipboard.writeText(text);
+          alert(`Código de juego: ${sync.code}\n\nCopié el código y enlace al portapapeles.`);
+        }
+      } catch (error) {
+        if (!error || error.name !== "AbortError") {
+          alert(`Código de juego: ${sync.code}`);
+        }
+      }
+
+      applyUi();
+      renderGame();
+    }
+
+    async function generateUniqueGameCode() {
+      for (let attempt = 0; attempt < 12; attempt++) {
+        const code = String(Math.floor(1000000 + Math.random() * 9000000));
+        const snapshot = await get(ref(firebaseState.db, `games/${code}/public`));
+        if (!snapshot.exists()) return code;
+      }
+
+      alert("No se pudo generar un código disponible. Intenta nuevamente.");
+      return null;
+    }
+
+    function buildPublicGame() {
+      return {
+        code: sync.code,
+        updatedAt: Date.now(),
+        createdAt: game.createdAt,
+        rounds: game.rounds,
+        players: game.players,
+        startingDealerId: game.startingDealerId,
+        scores: game.scores
+      };
+    }
+
+    async function publishRemoteGame(showMessage = false) {
+      if (!isHostMode() || !sync.code || !game) return false;
+
+      const ready = await ensureFirebaseReady();
+      if (!ready) return false;
+
+      try {
+        await set(ref(firebaseState.db, `games/${sync.code}/public`), buildPublicGame());
+        sync.lastRemoteUpdate = new Date().toISOString();
+        saveSync();
+        renderSyncStatus();
+        if (showMessage) showSaveStatus(`🔗 Código ${sync.code} actualizado`);
+        return true;
+      } catch (error) {
+        console.error(error);
+        if (showMessage) alert("No se pudo publicar el marcador. Revisa conexión y reglas de Firebase.");
+        return false;
+      }
+    }
+
+    function queueRemoteSave() {
+      window.clearTimeout(remoteSaveTimer);
+      remoteSaveTimer = window.setTimeout(() => {
+        publishRemoteGame(false);
+      }, 700);
+    }
+
+    async function askAndLoadSpectatorGame() {
+      const current = sync.code || "";
+      const input = prompt("Ingresa el código de juego de 7 cifras", current);
+      const code = normalizeGameCode(input);
+
+      if (!code) {
+        if (input !== null) alert("El código debe tener 7 cifras numéricas.");
+        return;
+      }
+
+      sync = { mode: "viewer", code, lastRemoteUpdate: null };
+      ui.configVisible = false;
+      saveSync();
+      saveUi();
+      applyUi();
+      await refreshRemoteGame(true);
+      startRemoteAutoRefresh();
+    }
+
+    async function refreshRemoteGame(showMessage = false) {
+      if (!isViewerMode() || !sync.code) return;
+
+      const ready = await ensureFirebaseReady();
+      if (!ready) return;
+
+      try {
+        const snapshot = await get(ref(firebaseState.db, `games/${sync.code}/public`));
+        if (!snapshot.exists()) {
+          if (showMessage) alert("No encontré una partida con ese código.");
+          return;
+        }
+
+        const remote = snapshot.val();
+        game = normalizeRemoteGame(remote);
+        sync.lastRemoteUpdate = new Date(remote.updatedAt || Date.now()).toISOString();
+        saveSync();
+        localStorage.setItem(GAME_KEY, JSON.stringify(game));
+        applyUi();
+        renderConfig();
+        renderGame();
+        if (showMessage) showSaveStatus("🔄 Marcador actualizado");
+      } catch (error) {
+        console.error(error);
+        if (showMessage) alert("No se pudo refrescar el marcador.");
+      }
+    }
+
+    function normalizeRemoteGame(remote) {
+      return {
+        createdAt: remote.createdAt || new Date().toISOString(),
+        rounds: Number(remote.rounds) || 10,
+        players: Array.isArray(remote.players) ? remote.players : [],
+        startingDealerId: remote.startingDealerId || remote.players?.[0]?.id,
+        scores: Array.isArray(remote.scores) ? remote.scores : []
+      };
+    }
+
+    function startRemoteAutoRefresh() {
+      stopRemoteAutoRefresh();
+      if (!isViewerMode()) return;
+
+      remoteRefreshTimer = window.setInterval(() => {
+        refreshRemoteGame(false);
+      }, 3 * 60 * 1000);
+    }
+
+    function stopRemoteAutoRefresh() {
+      if (remoteRefreshTimer) window.clearInterval(remoteRefreshTimer);
+      remoteRefreshTimer = null;
+    }
+
+    function exitViewerMode() {
+      stopRemoteAutoRefresh();
+      sync = { mode: null, code: null, lastRemoteUpdate: null };
+      saveSync();
+      ui.configVisible = true;
+      saveUi();
+      applyUi();
+      renderConfig();
+      renderGame();
+    }
+
+    function buildViewerUrl(code) {
+      const url = new URL(window.location.href);
+      url.searchParams.set("game", code);
+      return url.toString();
+    }
+
+    function renderSyncStatus() {
+      if (!sync.code) {
+        el.syncStatus.classList.add("hidden");
+        el.syncStatus.textContent = "";
+        return;
+      }
+
+      const modeText = isViewerMode() ? "Solo lectura" : "Anfitrión";
+      const updateText = sync.lastRemoteUpdate
+        ? ` · ${new Date(sync.lastRemoteUpdate).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}`
+        : "";
+
+      el.syncStatus.textContent = `${isViewerMode() ? "👀" : "🔗"} Código ${sync.code} · ${modeText}${updateText}`;
+      el.syncStatus.classList.remove("hidden");
     }
 
     async function shareSummary() {
