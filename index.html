@@ -1,0 +1,1589 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Marcador Skyjo</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --panel-soft: #f9fafc;
+      --text: #172033;
+      --muted: #667085;
+      --line: #dde3ee;
+      --primary: #2f6fec;
+      --primary-dark: #1f56bd;
+      --danger: #d92d20;
+      --shadow: 0 12px 32px rgba(16, 24, 40, 0.10);
+      --radius-lg: 22px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top left, rgba(47, 111, 236, 0.14), transparent 32rem),
+        radial-gradient(circle at bottom right, rgba(245, 158, 11, 0.12), transparent 30rem),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      padding: 18px;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .app {
+      width: min(1180px, 100%);
+      margin: 0 auto;
+    }
+
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 5vw, 3rem);
+      line-height: 1;
+      letter-spacing: -0.04em;
+    }
+
+    .hero p {
+      margin: 10px 0 0;
+      color: var(--muted);
+      max-width: 620px;
+      font-size: 1rem;
+    }
+
+    .hero-badge {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      border-radius: 999px;
+      padding: 10px 14px;
+      box-shadow: var(--shadow);
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 380px minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.92);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 18px 18px 12px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,0.5);
+    }
+
+    .panel-header h2 {
+      margin: 0;
+      font-size: 1.08rem;
+    }
+
+    .panel-header p {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.35;
+    }
+
+    .panel-body {
+      padding: 18px;
+    }
+
+    .setting-block {
+      margin-bottom: 18px;
+    }
+
+    .setting-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+      color: var(--text);
+      font-weight: 800;
+    }
+
+    .setting-title small {
+      color: var(--muted);
+      font-weight: 650;
+    }
+
+    .btn-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .choice-btn,
+    .action-btn,
+    .icon-btn,
+    .score-btn,
+    .key-btn {
+      border-radius: var(--radius-sm);
+      background: var(--panel-soft);
+      color: var(--text);
+      border: 1px solid var(--line);
+      min-height: 44px;
+      font-weight: 800;
+      transition: transform 0.12s ease, background 0.12s ease, border 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    .choice-btn:active,
+    .action-btn:active,
+    .icon-btn:active,
+    .score-btn:active,
+    .key-btn:active {
+      transform: scale(0.97);
+    }
+
+    .choice-btn.active {
+      background: #eaf1ff;
+      border-color: rgba(47,111,236,0.55);
+      color: var(--primary-dark);
+      box-shadow: inset 0 0 0 1px rgba(47,111,236,0.12);
+    }
+
+    .players-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .player-card {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+    }
+
+    .turn-pill {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      color: #fff;
+      font-weight: 950;
+      box-shadow: inset 0 0 0 100px rgba(0,0,0,0.08);
+    }
+
+    .player-fields {
+      min-width: 0;
+    }
+
+    .player-name {
+      width: 100%;
+      min-height: 42px;
+      padding: 0 12px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      outline: none;
+      font-weight: 750;
+      color: var(--text);
+    }
+
+    .player-name:focus {
+      border-color: rgba(47,111,236,0.75);
+      box-shadow: 0 0 0 4px rgba(47,111,236,0.12);
+    }
+
+    .color-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .color-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      border: 2px solid rgba(255,255,255,0.95);
+      box-shadow: 0 0 0 1px rgba(16, 24, 40, 0.18);
+    }
+
+    .color-btn.active {
+      box-shadow: 0 0 0 3px rgba(47,111,236,0.22), 0 0 0 1px rgba(16, 24, 40, 0.22);
+    }
+
+    .order-actions {
+      display: grid;
+      gap: 6px;
+    }
+
+    .icon-btn {
+      width: 40px;
+      min-height: 38px;
+      background: #fff;
+    }
+
+    .primary-actions {
+      display: grid;
+      gap: 10px;
+      position: sticky;
+      bottom: calc(12px + var(--safe-bottom));
+      z-index: 2;
+      padding-top: 6px;
+      background: linear-gradient(transparent, rgba(255,255,255,0.92) 22%);
+    }
+
+    .action-btn {
+      min-height: 50px;
+      padding: 0 16px;
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+      box-shadow: 0 10px 22px rgba(47, 111, 236, 0.24);
+    }
+
+    .action-btn.secondary {
+      background: #fff;
+      color: var(--primary-dark);
+      box-shadow: none;
+      border-color: rgba(47,111,236,0.22);
+    }
+
+    .action-btn.danger {
+      background: #fff;
+      color: var(--danger);
+      border-color: rgba(217,45,32,0.24);
+      box-shadow: none;
+    }
+
+    .status-line {
+      min-height: 22px;
+      color: var(--muted);
+      font-size: 0.88rem;
+      text-align: center;
+      font-weight: 650;
+    }
+
+    .score-panel {
+      min-height: 520px;
+    }
+
+    .game-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .game-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .summary-chip {
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 10px;
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 0.88rem;
+    }
+
+    .leaderboard {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+      gap: 10px;
+      margin: 14px 18px 0;
+    }
+
+    .leader-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px;
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+    }
+
+    .leader-dot {
+      width: 14px;
+      height: 42px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+    }
+
+    .leader-card strong {
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .leader-card span {
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 0.88rem;
+    }
+
+    .winner {
+      background: #fff7df;
+      border-color: rgba(245, 158, 11, 0.35);
+    }
+
+    .table-wrap {
+      overflow: auto;
+      margin: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: #fff;
+      max-height: min(68vh, 760px);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      min-width: 560px;
+    }
+
+    th,
+    td {
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      text-align: center;
+      padding: 8px;
+    }
+
+    th:last-child,
+    td:last-child {
+      border-right: 0;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: #fff;
+      font-size: 0.9rem;
+      color: var(--text);
+      padding: 10px 8px;
+    }
+
+    .round-head {
+      position: sticky;
+      left: 0;
+      z-index: 4;
+      min-width: 112px;
+      text-align: left;
+      background: #fff;
+    }
+
+    tbody .round-cell {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: rgba(255,255,255,0.86);
+      backdrop-filter: blur(4px);
+      text-align: left;
+      min-width: 112px;
+      font-weight: 900;
+      vertical-align: middle;
+    }
+
+    .round-meta {
+      display: grid;
+      gap: 4px;
+    }
+
+    .round-meta small {
+      display: block;
+      color: var(--muted);
+      font-weight: 800;
+      line-height: 1.15;
+      font-size: 0.72rem;
+    }
+
+    .player-header {
+      display: grid;
+      place-items: center;
+      gap: 4px;
+      min-width: 88px;
+    }
+
+    .player-label {
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 950;
+    }
+
+    .player-color-line {
+      width: 38px;
+      height: 5px;
+      border-radius: 999px;
+    }
+
+    .score-btn {
+      width: 100%;
+      min-height: 48px;
+      background: rgba(255,255,255,0.72);
+      line-height: 1.15;
+      padding: 6px;
+    }
+
+    .score-btn.active-cell {
+      outline: 3px solid rgba(47,111,236,0.24);
+      border-color: rgba(47,111,236,0.55);
+      background: #eef5ff;
+    }
+
+    .score-round {
+      display: block;
+      font-weight: 950;
+      color: var(--text);
+    }
+
+    .score-total {
+      display: block;
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-weight: 850;
+      margin-top: 2px;
+    }
+
+    .starter-mark {
+      display: inline-grid;
+      place-items: center;
+      width: 22px;
+      height: 22px;
+      margin-left: 4px;
+      border-radius: 999px;
+      background: #fff7df;
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      font-size: 0.8rem;
+    }
+
+    .score-editor-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.28);
+      display: none;
+      align-items: end;
+      justify-content: center;
+      padding: 16px;
+      z-index: 20;
+    }
+
+    .score-editor-backdrop.open {
+      display: flex;
+    }
+
+    .score-editor {
+      width: min(480px, 100%);
+      background: #fff;
+      border-radius: 26px;
+      box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.9);
+    }
+
+    .editor-head {
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .editor-head h3 {
+      margin: 0;
+      font-size: 1.05rem;
+      line-height: 1.2;
+    }
+
+    .editor-head small {
+      display: block;
+      color: var(--muted);
+      margin-top: 4px;
+      font-weight: 700;
+    }
+
+    .editor-close {
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      font-size: 1.1rem;
+    }
+
+    .editor-body {
+      padding: 18px;
+    }
+
+    .score-input {
+      width: 100%;
+      height: 58px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      text-align: center;
+      font-size: 1.45rem;
+      font-weight: 950;
+      outline: none;
+    }
+
+    .score-input:focus {
+      border-color: rgba(47,111,236,0.75);
+      box-shadow: 0 0 0 4px rgba(47,111,236,0.12);
+    }
+
+    .keypad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .key-btn {
+      min-height: 50px;
+      background: var(--panel-soft);
+      font-size: 1.08rem;
+    }
+
+    .editor-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .empty-state {
+      display: grid;
+      place-items: center;
+      min-height: 380px;
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .empty-state strong {
+      display: block;
+      color: var(--text);
+      font-size: 1.15rem;
+      margin-bottom: 8px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 900px) {
+      body {
+        padding: 12px;
+      }
+
+      .hero {
+        display: grid;
+      }
+
+      .hero-badge {
+        justify-self: start;
+      }
+
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .panel-body {
+        padding: 14px;
+      }
+
+      .btn-grid {
+        grid-template-columns: repeat(4, minmax(64px, 1fr));
+      }
+
+      .score-panel {
+        min-height: auto;
+      }
+
+      .table-wrap {
+        margin: 14px;
+        max-height: 62vh;
+      }
+
+      .leaderboard {
+        margin: 14px 14px 0;
+      }
+
+      th,
+      td {
+        padding: 6px;
+      }
+
+      .round-head,
+      tbody .round-cell {
+        min-width: 98px;
+      }
+
+      .score-btn {
+        min-height: 46px;
+      }
+    }
+
+    @media (max-width: 560px) {
+      body {
+        padding: 10px;
+      }
+
+      .hero p {
+        font-size: 0.92rem;
+      }
+
+      .panel {
+        border-radius: 18px;
+      }
+
+      .panel-header {
+        padding: 16px 14px 10px;
+      }
+
+      .player-card {
+        grid-template-columns: auto 1fr;
+      }
+
+      .order-actions {
+        grid-column: 1 / -1;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .icon-btn {
+        width: 100%;
+      }
+
+      .game-toolbar {
+        display: grid;
+      }
+
+      .game-summary {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .summary-chip {
+        text-align: center;
+      }
+
+      .leaderboard {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .table-wrap {
+        max-height: 58vh;
+      }
+
+      table {
+        min-width: 520px;
+      }
+
+      .player-header {
+        min-width: 74px;
+      }
+
+      .player-label {
+        max-width: 82px;
+      }
+
+      .round-meta small {
+        font-size: 0.68rem;
+      }
+
+      .score-editor-backdrop {
+        padding: 10px;
+      }
+
+      .score-editor {
+        border-radius: 22px;
+      }
+    }
+
+    @media (orientation: landscape) and (max-height: 540px) {
+      body {
+        padding: 10px;
+      }
+
+      .hero {
+        margin-bottom: 10px;
+      }
+
+      .hero p {
+        display: none;
+      }
+
+      .layout {
+        grid-template-columns: 340px minmax(0, 1fr);
+        gap: 10px;
+      }
+
+      .panel-header,
+      .panel-body {
+        padding: 12px;
+      }
+
+      .setting-block {
+        margin-bottom: 12px;
+      }
+
+      .players-list {
+        max-height: 250px;
+        overflow: auto;
+        padding-right: 2px;
+      }
+
+      .table-wrap {
+        max-height: 55vh;
+      }
+
+      .score-editor-backdrop {
+        align-items: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <div>
+        <h1>Marcador Skyjo</h1>
+        <p>Configura jugadores, rondas y colores. La tabla calcula automáticamente el puntaje acumulado y recuerda la configuración para el próximo juego.</p>
+      </div>
+      <div class="hero-badge" aria-label="Puntaje menor gana">🏆 Menos puntos gana</div>
+    </header>
+
+    <section class="layout">
+      <aside class="panel" aria-labelledby="config-title">
+        <div class="panel-header">
+          <h2 id="config-title">⚙️ Configuración</h2>
+          <p>Todo se guarda automáticamente en este dispositivo.</p>
+        </div>
+
+        <div class="panel-body">
+          <div class="setting-block">
+            <div class="setting-title">
+              <span>👥 Jugadores</span>
+              <small id="player-count-label">2 jugadores</small>
+            </div>
+            <div class="btn-grid" id="player-count-buttons" aria-label="Cantidad de jugadores"></div>
+          </div>
+
+          <div class="setting-block">
+            <div class="setting-title">
+              <span>🔁 Rondas</span>
+              <small id="round-count-label">10 rondas</small>
+            </div>
+            <div class="btn-grid" id="round-buttons" aria-label="Cantidad de rondas"></div>
+          </div>
+
+          <div class="setting-block">
+            <div class="setting-title">
+              <span>🎲 Orden de turnos</span>
+              <small>Sube o baja jugadores</small>
+            </div>
+            <div class="players-list" id="players-list"></div>
+          </div>
+
+          <div class="primary-actions">
+            <button class="action-btn" id="start-game-btn">▶️ Iniciar nueva partida</button>
+            <button class="action-btn secondary hidden" id="continue-game-btn">↩️ Continuar partida guardada</button>
+            <div class="status-line" id="save-status">Configuración lista</div>
+          </div>
+        </div>
+      </aside>
+
+      <section class="panel score-panel" aria-labelledby="score-title">
+        <div class="panel-header">
+          <div class="game-toolbar">
+            <div>
+              <h2 id="score-title">📊 Puntajes</h2>
+              <p id="score-subtitle">Inicia una partida para generar la tabla.</p>
+            </div>
+            <div class="game-summary" id="game-summary"></div>
+          </div>
+        </div>
+
+        <div id="empty-state" class="empty-state">
+          <div>
+            <strong>La grilla aparecerá aquí.</strong>
+            Configura jugadores y rondas, luego presiona “Iniciar nueva partida”.
+          </div>
+        </div>
+
+        <div id="game-area" class="hidden">
+          <div class="leaderboard" id="leaderboard"></div>
+
+          <div class="table-wrap" aria-label="Tabla de puntajes">
+            <table id="score-table"></table>
+          </div>
+
+          <div class="panel-body">
+            <div class="primary-actions">
+              <button class="action-btn secondary" id="export-btn">📋 Copiar resumen</button>
+              <button class="action-btn danger" id="clear-scores-btn">🧹 Limpiar puntajes</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div class="score-editor-backdrop" id="score-editor-backdrop" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+    <div class="score-editor">
+      <div class="editor-head">
+        <div>
+          <h3 id="editor-title">Ingresar puntaje</h3>
+          <small id="editor-subtitle">Ronda y jugador</small>
+        </div>
+        <button class="editor-close" id="close-editor-btn" aria-label="Cerrar">✕</button>
+      </div>
+
+      <div class="editor-body">
+        <input
+          id="score-input"
+          class="score-input"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          placeholder="0"
+          autocomplete="off"
+        />
+
+        <div class="keypad" aria-label="Teclado numérico">
+          <button class="key-btn" data-key="1">1</button>
+          <button class="key-btn" data-key="2">2</button>
+          <button class="key-btn" data-key="3">3</button>
+          <button class="key-btn" data-key="4">4</button>
+          <button class="key-btn" data-key="5">5</button>
+          <button class="key-btn" data-key="6">6</button>
+          <button class="key-btn" data-key="7">7</button>
+          <button class="key-btn" data-key="8">8</button>
+          <button class="key-btn" data-key="9">9</button>
+          <button class="key-btn" data-key="back">⌫</button>
+          <button class="key-btn" data-key="0">0</button>
+          <button class="key-btn" data-key="clear">🧹</button>
+        </div>
+
+        <div class="editor-actions">
+          <button class="action-btn secondary" id="delete-score-btn">🗑️ Borrar</button>
+          <button class="action-btn" id="save-score-btn">✅ Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const CONFIG_KEY = "skyjo_config_v1";
+    const GAME_KEY = "skyjo_game_v1";
+
+    const COLORS = [
+      { name: "Rojo", value: "#ef4444" },
+      { name: "Azul", value: "#3b82f6" },
+      { name: "Verde", value: "#22c55e" },
+      { name: "Amarillo", value: "#f59e0b" },
+      { name: "Morado", value: "#8b5cf6" },
+      { name: "Naranjo", value: "#f97316" },
+      { name: "Celeste", value: "#06b6d4" },
+      { name: "Rosado", value: "#ec4899" }
+    ];
+
+    const PLAYER_OPTIONS = [2, 3, 4, 5, 6, 7, 8];
+    const ROUND_OPTIONS = [5, 10, 15, 20];
+
+    const defaultConfig = {
+      playerCount: 2,
+      rounds: 10,
+      players: Array.from({ length: 8 }, (_, index) => ({
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + index),
+        name: `Jugador ${index + 1}`,
+        color: COLORS[index].value
+      }))
+    };
+
+    let config = loadConfig();
+    let game = loadGame();
+    let selectedCell = null;
+
+    const el = {
+      playerCountButtons: document.getElementById("player-count-buttons"),
+      playerCountLabel: document.getElementById("player-count-label"),
+      roundButtons: document.getElementById("round-buttons"),
+      roundCountLabel: document.getElementById("round-count-label"),
+      playersList: document.getElementById("players-list"),
+      saveStatus: document.getElementById("save-status"),
+      startGameBtn: document.getElementById("start-game-btn"),
+      continueGameBtn: document.getElementById("continue-game-btn"),
+      emptyState: document.getElementById("empty-state"),
+      gameArea: document.getElementById("game-area"),
+      scoreSubtitle: document.getElementById("score-subtitle"),
+      gameSummary: document.getElementById("game-summary"),
+      scoreTable: document.getElementById("score-table"),
+      leaderboard: document.getElementById("leaderboard"),
+      clearScoresBtn: document.getElementById("clear-scores-btn"),
+      exportBtn: document.getElementById("export-btn"),
+      editorBackdrop: document.getElementById("score-editor-backdrop"),
+      closeEditorBtn: document.getElementById("close-editor-btn"),
+      editorTitle: document.getElementById("editor-title"),
+      editorSubtitle: document.getElementById("editor-subtitle"),
+      scoreInput: document.getElementById("score-input"),
+      saveScoreBtn: document.getElementById("save-score-btn"),
+      deleteScoreBtn: document.getElementById("delete-score-btn")
+    };
+
+    init();
+
+    function init() {
+      renderConfig();
+      renderGame();
+      bindEvents();
+    }
+
+    function loadConfig() {
+      try {
+        const stored = JSON.parse(localStorage.getItem(CONFIG_KEY));
+        if (!stored) return structuredCloneSafe(defaultConfig);
+
+        const players = [...(stored.players || [])];
+        while (players.length < 8) {
+          players.push({
+            id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + players.length),
+            name: `Jugador ${players.length + 1}`,
+            color: COLORS[players.length % COLORS.length].value
+          });
+        }
+
+        return {
+          playerCount: clamp(Number(stored.playerCount) || 2, 2, 8),
+          rounds: ROUND_OPTIONS.includes(Number(stored.rounds)) ? Number(stored.rounds) : 10,
+          players: players.slice(0, 8).map((player, index) => ({
+            id: player.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + index)),
+            name: player.name || `Jugador ${index + 1}`,
+            color: player.color || COLORS[index % COLORS.length].value
+          }))
+        };
+      } catch {
+        return structuredCloneSafe(defaultConfig);
+      }
+    }
+
+    function loadGame() {
+      try {
+        const stored = JSON.parse(localStorage.getItem(GAME_KEY));
+        if (!stored || !stored.players || !stored.scores) return null;
+        return stored;
+      } catch {
+        return null;
+      }
+    }
+
+    function saveConfig() {
+      localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+      showSaveStatus("✅ Configuración guardada");
+    }
+
+    function saveGame() {
+      if (!game) return;
+      localStorage.setItem(GAME_KEY, JSON.stringify(game));
+    }
+
+    function showSaveStatus(message) {
+      el.saveStatus.textContent = message;
+      window.clearTimeout(showSaveStatus.timer);
+      showSaveStatus.timer = window.setTimeout(() => {
+        el.saveStatus.textContent = "Cambios guardados en este dispositivo";
+      }, 1400);
+    }
+
+    function renderConfig() {
+      el.playerCountLabel.textContent = `${config.playerCount} jugadores`;
+      el.roundCountLabel.textContent = `${config.rounds} rondas`;
+
+      el.playerCountButtons.innerHTML = "";
+      PLAYER_OPTIONS.forEach(count => {
+        const button = document.createElement("button");
+        button.className = `choice-btn ${config.playerCount === count ? "active" : ""}`;
+        button.type = "button";
+        button.textContent = `👥 ${count}`;
+        button.setAttribute("aria-pressed", String(config.playerCount === count));
+        button.addEventListener("click", () => {
+          config.playerCount = count;
+          saveConfig();
+          renderConfig();
+        });
+        el.playerCountButtons.appendChild(button);
+      });
+
+      el.roundButtons.innerHTML = "";
+      ROUND_OPTIONS.forEach(rounds => {
+        const button = document.createElement("button");
+        button.className = `choice-btn ${config.rounds === rounds ? "active" : ""}`;
+        button.type = "button";
+        button.textContent = `🔁 ${rounds}`;
+        button.setAttribute("aria-pressed", String(config.rounds === rounds));
+        button.addEventListener("click", () => {
+          config.rounds = rounds;
+          saveConfig();
+          renderConfig();
+        });
+        el.roundButtons.appendChild(button);
+      });
+
+      el.playersList.innerHTML = "";
+      config.players.slice(0, config.playerCount).forEach((player, index) => {
+        const card = document.createElement("div");
+        card.className = "player-card";
+
+        const turn = document.createElement("div");
+        turn.className = "turn-pill";
+        turn.style.background = player.color;
+        turn.textContent = index + 1;
+        turn.title = `Turno ${index + 1}`;
+
+        const fields = document.createElement("div");
+        fields.className = "player-fields";
+
+        const input = document.createElement("input");
+        input.className = "player-name";
+        input.value = player.name;
+        input.placeholder = `Jugador ${index + 1}`;
+        input.setAttribute("aria-label", `Nombre jugador ${index + 1}`);
+        input.addEventListener("input", () => {
+          player.name = input.value;
+          saveConfig();
+        });
+        input.addEventListener("blur", () => {
+          player.name = cleanName(input.value, index);
+          input.value = player.name;
+          saveConfig();
+        });
+
+        const colorRow = document.createElement("div");
+        colorRow.className = "color-row";
+        COLORS.forEach(color => {
+          const colorBtn = document.createElement("button");
+          colorBtn.className = `color-btn ${player.color === color.value ? "active" : ""}`;
+          colorBtn.type = "button";
+          colorBtn.style.background = color.value;
+          colorBtn.title = color.name;
+          colorBtn.setAttribute("aria-label", `Color ${color.name}`);
+          colorBtn.addEventListener("click", () => {
+            player.color = color.value;
+            saveConfig();
+            renderConfig();
+          });
+          colorRow.appendChild(colorBtn);
+        });
+
+        fields.appendChild(input);
+        fields.appendChild(colorRow);
+
+        const actions = document.createElement("div");
+        actions.className = "order-actions";
+
+        const upBtn = document.createElement("button");
+        upBtn.className = "icon-btn";
+        upBtn.type = "button";
+        upBtn.textContent = "⬆️";
+        upBtn.title = "Subir en el orden";
+        upBtn.disabled = index === 0;
+        upBtn.addEventListener("click", () => movePlayer(index, -1));
+
+        const downBtn = document.createElement("button");
+        downBtn.className = "icon-btn";
+        downBtn.type = "button";
+        downBtn.textContent = "⬇️";
+        downBtn.title = "Bajar en el orden";
+        downBtn.disabled = index === config.playerCount - 1;
+        downBtn.addEventListener("click", () => movePlayer(index, 1));
+
+        actions.appendChild(upBtn);
+        actions.appendChild(downBtn);
+
+        card.appendChild(turn);
+        card.appendChild(fields);
+        card.appendChild(actions);
+
+        el.playersList.appendChild(card);
+      });
+
+      el.continueGameBtn.classList.toggle("hidden", !game);
+    }
+
+    function movePlayer(index, direction) {
+      const target = index + direction;
+      if (target < 0 || target >= config.playerCount) return;
+
+      const copy = [...config.players];
+      [copy[index], copy[target]] = [copy[target], copy[index]];
+      config.players = copy;
+      saveConfig();
+      renderConfig();
+    }
+
+    function bindEvents() {
+      el.startGameBtn.addEventListener("click", startNewGame);
+      el.continueGameBtn.addEventListener("click", () => {
+        game = loadGame();
+        renderGame();
+        document.getElementById("score-title").scrollIntoView({ block: "start" });
+      });
+
+      el.clearScoresBtn.addEventListener("click", () => {
+        if (!game) return;
+        game.scores = createEmptyScores(game.rounds, game.players.length);
+        saveGame();
+        renderGame();
+      });
+
+      el.exportBtn.addEventListener("click", copySummary);
+
+      el.closeEditorBtn.addEventListener("click", closeEditor);
+      el.editorBackdrop.addEventListener("click", event => {
+        if (event.target === el.editorBackdrop) closeEditor();
+      });
+
+      el.saveScoreBtn.addEventListener("click", saveSelectedScore);
+      el.deleteScoreBtn.addEventListener("click", deleteSelectedScore);
+
+      document.querySelectorAll(".key-btn").forEach(button => {
+        button.addEventListener("click", () => handleKeypad(button.dataset.key));
+      });
+
+      el.scoreInput.addEventListener("keydown", event => {
+        if (event.key === "Enter") saveSelectedScore();
+        if (event.key === "Escape") closeEditor();
+      });
+
+      el.scoreInput.addEventListener("input", () => {
+        el.scoreInput.value = el.scoreInput.value.replace(/[^\d]/g, "").slice(0, 4);
+      });
+    }
+
+    function startNewGame() {
+      const players = config.players.slice(0, config.playerCount).map((player, index) => ({
+        id: player.id,
+        name: cleanName(player.name, index),
+        color: player.color
+      }));
+
+      config.players = [
+        ...players,
+        ...config.players.slice(config.playerCount)
+      ];
+      saveConfig();
+
+      game = {
+        createdAt: new Date().toISOString(),
+        rounds: config.rounds,
+        players,
+        scores: createEmptyScores(config.rounds, players.length)
+      };
+
+      saveGame();
+      renderConfig();
+      renderGame();
+      document.getElementById("score-title").scrollIntoView({ block: "start" });
+    }
+
+    function createEmptyScores(rounds, playerCount) {
+      return Array.from({ length: rounds }, () => Array.from({ length: playerCount }, () => null));
+    }
+
+    function renderGame() {
+      if (!game) {
+        el.emptyState.classList.remove("hidden");
+        el.gameArea.classList.add("hidden");
+        el.scoreSubtitle.textContent = "Inicia una partida para generar la tabla.";
+        el.gameSummary.innerHTML = "";
+        return;
+      }
+
+      el.emptyState.classList.add("hidden");
+      el.gameArea.classList.remove("hidden");
+
+      el.scoreSubtitle.textContent = "Toca una celda para ingresar o editar el puntaje de la ronda.";
+      el.gameSummary.innerHTML = `
+        <span class="summary-chip">👥 ${game.players.length} jugadores</span>
+        <span class="summary-chip">🔁 ${game.rounds} rondas</span>
+        <span class="summary-chip">🃏 Color = reparte</span>
+        <span class="summary-chip">⭐ Parte ronda</span>
+      `;
+
+      renderLeaderboard();
+      renderScoreTable();
+      el.continueGameBtn.classList.toggle("hidden", !game);
+    }
+
+    function renderLeaderboard() {
+      const totals = getTotals();
+      const ordered = game.players.map((player, index) => ({
+        player,
+        index,
+        total: totals[index]
+      })).sort((a, b) => a.total - b.total);
+
+      el.leaderboard.innerHTML = "";
+      ordered.forEach((item, rank) => {
+        const card = document.createElement("div");
+        card.className = `leader-card ${rank === 0 ? "winner" : ""}`;
+
+        const dot = document.createElement("div");
+        dot.className = "leader-dot";
+        dot.style.background = item.player.color;
+
+        const text = document.createElement("div");
+        text.innerHTML = `
+          <strong>${rank === 0 ? "🏆 " : ""}${escapeHtml(item.player.name)}</strong>
+          <span>${item.total} puntos</span>
+        `;
+
+        card.appendChild(dot);
+        card.appendChild(text);
+        el.leaderboard.appendChild(card);
+      });
+    }
+
+    function renderScoreTable() {
+      const labels = getDisplayLabels(game.players);
+      const totalsByRound = getTotalsByRound();
+
+      const table = document.createElement("table");
+
+      const thead = document.createElement("thead");
+      const headerRow = document.createElement("tr");
+
+      const roundHead = document.createElement("th");
+      roundHead.className = "round-head";
+      roundHead.textContent = "Ronda";
+      headerRow.appendChild(roundHead);
+
+      game.players.forEach((player, index) => {
+        const th = document.createElement("th");
+        const header = document.createElement("div");
+        header.className = "player-header";
+
+        const label = document.createElement("span");
+        label.className = "player-label";
+        label.textContent = labels[index];
+        label.title = player.name;
+
+        const line = document.createElement("span");
+        line.className = "player-color-line";
+        line.style.background = player.color;
+
+        header.appendChild(label);
+        header.appendChild(line);
+        th.appendChild(header);
+        headerRow.appendChild(th);
+      });
+
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+
+      for (let roundIndex = 0; roundIndex < game.rounds; roundIndex++) {
+        const dealerIndex = roundIndex % game.players.length;
+        const starterIndex = (dealerIndex + 1) % game.players.length;
+        const dealer = game.players[dealerIndex];
+        const starter = game.players[starterIndex];
+
+        const tr = document.createElement("tr");
+        tr.style.background = hexToRgba(dealer.color, 0.12);
+
+        const roundCell = document.createElement("td");
+        roundCell.className = "round-cell";
+        roundCell.innerHTML = `
+          <div class="round-meta">
+            <strong>Ronda ${roundIndex + 1}</strong>
+            <small>🃏 ${escapeHtml(getShortName(dealer.name))}</small>
+            <small>⭐ ${escapeHtml(getShortName(starter.name))}</small>
+          </div>
+        `;
+        tr.appendChild(roundCell);
+
+        game.players.forEach((player, playerIndex) => {
+          const td = document.createElement("td");
+          const score = game.scores[roundIndex][playerIndex];
+          const total = totalsByRound[roundIndex][playerIndex];
+
+          const button = document.createElement("button");
+          button.className = "score-btn";
+          button.type = "button";
+          button.style.borderColor = playerIndex === starterIndex ? "rgba(245, 158, 11, 0.55)" : "";
+          button.innerHTML = score === null
+            ? `<span class="score-round">＋</span><span class="score-total">Ingresar</span>${playerIndex === starterIndex ? '<span class="starter-mark">⭐</span>' : ''}`
+            : `<span class="score-round">${score} - ${total}</span><span class="score-total">Ronda - Total</span>${playerIndex === starterIndex ? '<span class="starter-mark">⭐</span>' : ''}`;
+
+          button.title = `${player.name}, ronda ${roundIndex + 1}`;
+          button.addEventListener("click", () => openEditor(roundIndex, playerIndex));
+
+          td.appendChild(button);
+          tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+      }
+
+      table.appendChild(tbody);
+      el.scoreTable.replaceWith(table);
+      table.id = "score-table";
+      el.scoreTable = table;
+    }
+
+    function openEditor(roundIndex, playerIndex) {
+      selectedCell = { roundIndex, playerIndex };
+      const player = game.players[playerIndex];
+      const value = game.scores[roundIndex][playerIndex];
+
+      el.editorTitle.textContent = `${player.name}`;
+      el.editorSubtitle.textContent = `Ronda ${roundIndex + 1} · Puntaje de la ronda`;
+      el.scoreInput.value = value === null ? "" : String(value);
+      el.editorBackdrop.classList.add("open");
+
+      setTimeout(() => {
+        el.scoreInput.focus();
+        el.scoreInput.select();
+      }, 50);
+    }
+
+    function closeEditor() {
+      selectedCell = null;
+      el.editorBackdrop.classList.remove("open");
+      el.scoreInput.value = "";
+    }
+
+    function saveSelectedScore() {
+      if (!selectedCell || !game) return;
+
+      const rawValue = el.scoreInput.value.trim();
+      if (rawValue === "") {
+        deleteSelectedScore();
+        return;
+      }
+
+      const value = Number(rawValue);
+      if (!Number.isInteger(value) || value < 0) {
+        el.scoreInput.focus();
+        return;
+      }
+
+      game.scores[selectedCell.roundIndex][selectedCell.playerIndex] = value;
+      saveGame();
+      closeEditor();
+      renderGame();
+    }
+
+    function deleteSelectedScore() {
+      if (!selectedCell || !game) return;
+      game.scores[selectedCell.roundIndex][selectedCell.playerIndex] = null;
+      saveGame();
+      closeEditor();
+      renderGame();
+    }
+
+    function handleKeypad(key) {
+      if (key === "back") {
+        el.scoreInput.value = el.scoreInput.value.slice(0, -1);
+        el.scoreInput.focus();
+        return;
+      }
+
+      if (key === "clear") {
+        el.scoreInput.value = "";
+        el.scoreInput.focus();
+        return;
+      }
+
+      if (/^\d$/.test(key) && el.scoreInput.value.length < 4) {
+        el.scoreInput.value += key;
+        el.scoreInput.focus();
+      }
+    }
+
+    function getTotals() {
+      if (!game) return [];
+      return game.players.map((_, playerIndex) => {
+        return game.scores.reduce((sum, round) => sum + (Number(round[playerIndex]) || 0), 0);
+      });
+    }
+
+    function getTotalsByRound() {
+      const totals = Array.from({ length: game.rounds }, () => Array.from({ length: game.players.length }, () => 0));
+      const running = Array.from({ length: game.players.length }, () => 0);
+
+      for (let roundIndex = 0; roundIndex < game.rounds; roundIndex++) {
+        for (let playerIndex = 0; playerIndex < game.players.length; playerIndex++) {
+          const value = game.scores[roundIndex][playerIndex];
+          if (value !== null) running[playerIndex] += Number(value) || 0;
+          totals[roundIndex][playerIndex] = running[playerIndex];
+        }
+      }
+
+      return totals;
+    }
+
+    function getDisplayLabels(players) {
+      if (players.length <= 4) {
+        return players.map(player => player.name);
+      }
+
+      const bases = players.map(player => getInitialBase(player.name));
+      const seen = new Map();
+
+      return bases.map(base => {
+        const count = seen.get(base) || 0;
+        seen.set(base, count + 1);
+        return count === 0 ? base : `${base}${count + 1}`;
+      });
+    }
+
+    function getInitialBase(name) {
+      const parts = name
+        .trim()
+        .replace(/\s+/g, " ")
+        .split(" ")
+        .filter(Boolean);
+
+      if (parts.length >= 2) {
+        return `${parts[0][0] || "J"}${parts[1][0] || ""}`.toUpperCase();
+      }
+
+      return (parts[0]?.[0] || "J").toUpperCase();
+    }
+
+    function getShortName(name) {
+      const clean = name.trim();
+      if (clean.length <= 10) return clean;
+      const parts = clean.split(/\s+/).filter(Boolean);
+      if (parts.length >= 2) return `${parts[0]} ${parts[1][0].toUpperCase()}.`;
+      return clean.slice(0, 10) + "…";
+    }
+
+    function cleanName(value, index) {
+      const clean = String(value || "").trim().replace(/\s+/g, " ");
+      return clean || `Jugador ${index + 1}`;
+    }
+
+    async function copySummary() {
+      if (!game) return;
+
+      const totals = getTotals();
+      const rows = game.players.map((player, index) => ({
+        name: player.name,
+        total: totals[index]
+      })).sort((a, b) => a.total - b.total);
+
+      const lines = [
+        "Resumen Skyjo",
+        `Jugadores: ${game.players.length}`,
+        `Rondas: ${game.rounds}`,
+        "",
+        "Resultado:",
+        ...rows.map((row, index) => `${index + 1}. ${row.name}: ${row.total} puntos`),
+        "",
+        "Detalle por ronda:"
+      ];
+
+      game.scores.forEach((round, roundIndex) => {
+        const detail = round.map((score, playerIndex) => {
+          const value = score === null ? "-" : score;
+          return `${game.players[playerIndex].name}: ${value}`;
+        }).join(" | ");
+        lines.push(`Ronda ${roundIndex + 1}: ${detail}`);
+      });
+
+      try {
+        await navigator.clipboard.writeText(lines.join("\n"));
+        showSaveStatus("📋 Resumen copiado");
+      } catch {
+        showSaveStatus("No se pudo copiar el resumen");
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function hexToRgba(hex, alpha) {
+      const clean = hex.replace("#", "");
+      const bigint = parseInt(clean, 16);
+      const r = (bigint >> 16) & 255;
+      const g = (bigint >> 8) & 255;
+      const b = bigint & 255;
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function structuredCloneSafe(value) {
+      if (window.structuredClone) return structuredClone(value);
+      return JSON.parse(JSON.stringify(value));
+    }
+  </script>
+</body>
+</html>
