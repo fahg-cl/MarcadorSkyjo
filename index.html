@@ -1098,7 +1098,7 @@
   </div>
 
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
     import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
@@ -1667,8 +1667,75 @@
       return Array.from({ length: rounds }, () => Array.from({ length: playerCount }, () => null));
     }
 
+function normalizeScoreValue(value) {
+  if (value === null || value === undefined || value === "") return null;
+
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function normalizeArrayLike(value) {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value === "object") {
+    return Object.keys(value)
+      .sort((a, b) => Number(a) - Number(b))
+      .map(key => value[key]);
+  }
+
+  return [];
+}
+
+function normalizeScores(rawScores, rounds, playerCount) {
+  const normalized = createEmptyScores(rounds, playerCount);
+  const rows = normalizeArrayLike(rawScores);
+
+  for (let roundIndex = 0; roundIndex < rounds; roundIndex++) {
+    const rawRow = rows[roundIndex];
+    const row = normalizeArrayLike(rawRow);
+
+    for (let playerIndex = 0; playerIndex < playerCount; playerIndex++) {
+      normalized[roundIndex][playerIndex] = normalizeScoreValue(row[playerIndex]);
+    }
+  }
+
+  return normalized;
+}
+
+function normalizeRemoteGame(rawGame) {
+  if (!rawGame) return null;
+
+  const players = normalizeArrayLike(rawGame.players)
+    .filter(Boolean)
+    .map((player, index) => ({
+      id: player.id || `p_remote_${index + 1}`,
+      name: player.name || `Jugador ${index + 1}`,
+      color: player.color || COLORS[index % COLORS.length].value
+    }));
+
+  const rounds = Number(rawGame.rounds) || 10;
+  const playerCount = players.length;
+
+  return {
+    ...rawGame,
+    createdAt: rawGame.createdAt || new Date().toISOString(),
+    rounds,
+    players,
+    startingDealerId: rawGame.startingDealerId || players[0]?.id || null,
+    scores: normalizeScores(rawGame.scores, rounds, playerCount)
+  };
+}
+
     function renderGame() {
-      if (!game) {
+      if (game) {
+        game = normalizeRemoteGame(game);
+      }
+
+      if (!game || !Array.isArray(game.players) || !game.players.length) {
         el.emptyState.classList.remove("hidden");
         el.gameArea.classList.add("hidden");
         el.gameSummary.innerHTML = "";
@@ -1692,6 +1759,11 @@
     }
 
     function renderSummary() {
+      if (!game || !Array.isArray(game.players) || !game.players.length) {
+        el.gameSummary.innerHTML = "";
+        return;
+      }
+
       const currentRoundIndex = getCurrentRoundIndex();
       const activeText = currentRoundIndex === null ? "Partida completa" : `Ronda activa ${currentRoundIndex + 1}`;
       const startingDealerIndex = getIndexById(game.players, game.startingDealerId);
@@ -1952,9 +2024,12 @@
     }
 
     function getCurrentRoundIndex() {
-      if (!game) return null;
+      if (!game || !Array.isArray(game.players) || !game.players.length) return null;
 
-      for (let roundIndex = 0; roundIndex < game.scores.length; roundIndex++) {
+      const rounds = Number(game.rounds) || 0;
+      game.scores = normalizeScores(game.scores, rounds, game.players.length);
+
+      for (let roundIndex = 0; roundIndex < rounds; roundIndex++) {
         if (!isRoundCompleted(roundIndex)) return roundIndex;
       }
 
@@ -1962,30 +2037,74 @@
     }
 
     function isRoundCompleted(roundIndex) {
-      return game.scores[roundIndex].every(value => value !== null && value !== undefined);
-    }
+      if (!game || !Array.isArray(game.players) || !game.players.length) return false;
 
-    function getTotals() {
-      if (!game) return [];
-      return game.players.map((_, playerIndex) => {
-        return game.scores.reduce((sum, round) => sum + (Number(round[playerIndex]) || 0), 0);
-      });
-    }
+      const playerCount = game.players.length;
+      const row = normalizeArrayLike(game.scores?.[roundIndex]);
 
-    function getTotalsByRound() {
-      const totals = Array.from({ length: game.rounds }, () => Array.from({ length: game.players.length }, () => 0));
-      const running = Array.from({ length: game.players.length }, () => 0);
+      if (row.length < playerCount) return false;
 
-      for (let roundIndex = 0; roundIndex < game.rounds; roundIndex++) {
-        for (let playerIndex = 0; playerIndex < game.players.length; playerIndex++) {
-          const value = game.scores[roundIndex][playerIndex];
-          if (value !== null && value !== undefined) running[playerIndex] += Number(value) || 0;
-          totals[roundIndex][playerIndex] = running[playerIndex];
-        }
+      for (let playerIndex = 0; playerIndex < playerCount; playerIndex++) {
+        const value = normalizeScoreValue(row[playerIndex]);
+        if (value === null || value === undefined) return false;
       }
 
-      return totals;
+      return true;
     }
+
+function getTotals() {
+  if (!game || !Array.isArray(game.players)) return [];
+
+  const rounds = Number(game.rounds) || 0;
+  const playerCount = game.players.length;
+
+  game.scores = normalizeScores(game.scores, rounds, playerCount);
+
+  return game.players.map((_, playerIndex) => {
+    let sum = 0;
+
+    for (let roundIndex = 0; roundIndex < rounds; roundIndex++) {
+      const value = game.scores[roundIndex]?.[playerIndex];
+
+      if (value !== null && value !== undefined) {
+        sum += Number(value) || 0;
+      }
+    }
+
+    return sum;
+  });
+}
+
+function getTotalsByRound() {
+  if (!game || !Array.isArray(game.players)) return [];
+
+  const rounds = Number(game.rounds) || 0;
+  const playerCount = game.players.length;
+
+  game.scores = normalizeScores(game.scores, rounds, playerCount);
+
+  const totals = Array.from({ length: rounds }, () =>
+    Array.from({ length: playerCount }, () => 0)
+  );
+
+  const running = Array.from({ length: playerCount }, () => 0);
+
+  for (let roundIndex = 0; roundIndex < rounds; roundIndex++) {
+    const round = game.scores[roundIndex] || [];
+
+    for (let playerIndex = 0; playerIndex < playerCount; playerIndex++) {
+      const value = round[playerIndex];
+
+      if (value !== null && value !== undefined) {
+        running[playerIndex] += Number(value) || 0;
+      }
+
+      totals[roundIndex][playerIndex] = running[playerIndex];
+    }
+  }
+
+  return totals;
+}
 
     function getDisplayLabels(players) {
       if (players.length <= 4) {
@@ -2032,6 +2151,8 @@
 
     function isFirebaseConfigured() {
       return Boolean(
+        typeof FIREBASE_CONFIG !== "undefined" &&
+        FIREBASE_CONFIG &&
         FIREBASE_CONFIG.apiKey &&
         FIREBASE_CONFIG.databaseURL &&
         !String(FIREBASE_CONFIG.apiKey).startsWith("PEGAR_") &&
@@ -2048,16 +2169,22 @@
       if (firebaseState.ready && firebaseState.user) return true;
 
       try {
-        firebaseState.app = firebaseState.app || initializeApp(FIREBASE_CONFIG);
+        firebaseState.app = firebaseState.app || (getApps().length ? getApp() : initializeApp(FIREBASE_CONFIG));
         firebaseState.auth = firebaseState.auth || getAuth(firebaseState.app);
         firebaseState.db = firebaseState.db || getDatabase(firebaseState.app);
-        const credential = await signInAnonymously(firebaseState.auth);
-        firebaseState.user = credential.user;
+
+        if (!firebaseState.auth.currentUser) {
+          const credential = await signInAnonymously(firebaseState.auth);
+          firebaseState.user = credential.user;
+        } else {
+          firebaseState.user = firebaseState.auth.currentUser;
+        }
+
         firebaseState.ready = true;
         return true;
       } catch (error) {
         console.error(error);
-        alert("No se pudo conectar con Firebase. Revisa la configuración y las reglas de seguridad.");
+        alert("No se pudo conectar con Firebase. Revisa la configuración, Authentication Anonymous y las reglas de seguridad.");
         return false;
       }
     }
@@ -2142,14 +2269,16 @@
     }
 
     function buildPublicGame() {
+      const safeGame = normalizeRemoteGame(game);
+
       return {
         code: sync.code,
         updatedAt: Date.now(),
-        createdAt: game.createdAt,
-        rounds: game.rounds,
-        players: game.players,
-        startingDealerId: game.startingDealerId,
-        scores: game.scores
+        createdAt: safeGame.createdAt,
+        rounds: safeGame.rounds,
+        players: safeGame.players,
+        startingDealerId: safeGame.startingDealerId,
+        scores: safeGame.scores
       };
     }
 
@@ -2227,15 +2356,7 @@
       }
     }
 
-    function normalizeRemoteGame(remote) {
-      return {
-        createdAt: remote.createdAt || new Date().toISOString(),
-        rounds: Number(remote.rounds) || 10,
-        players: Array.isArray(remote.players) ? remote.players : [],
-        startingDealerId: remote.startingDealerId || remote.players?.[0]?.id,
-        scores: Array.isArray(remote.scores) ? remote.scores : []
-      };
-    }
+    // Definición duplicada de normalizeRemoteGame eliminada para evitar error de módulo.
 
     function startRemoteAutoRefresh() {
       stopRemoteAutoRefresh();
